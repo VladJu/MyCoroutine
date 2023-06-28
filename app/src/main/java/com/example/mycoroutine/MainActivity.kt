@@ -2,10 +2,13 @@ package com.example.mycoroutine
 
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.mycoroutine.databinding.ActivityMainBinding
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -20,22 +23,33 @@ class MainActivity : AppCompatActivity() {
         binding.buttonLoad.setOnClickListener {
             binding.progress.isVisible = true
             binding.buttonLoad.isEnabled = false
-            //Создаем новую корутину
-            val jobCity=lifecycleScope.launch {
-                //1) Загружаем город и устанавливем его
-                val city=loadCity()
+
+            //1)Корутина будет запущена на выполнение, создастся объект Deferred<> и внутри
+            // этого объекта как загрузка будет завершена будет лежать строка
+            val deferredCity : Deferred<String> = lifecycleScope.async {
+                val city = loadCity()
                 binding.tvLocation.text = city
+                //2)какое значение будет последним в этом блоке, то значение и верент Deferred
+                city
             }
-        //2) создаем 2 корутин и внтури делаем загрузку устанавливая полсе ее завершение значение
-            val jobTemp=lifecycleScope.launch {
+
+            val deferredTemp : Deferred<Int> = lifecycleScope.async {
                 val temp = loadTemperature()
-                binding.tvTemperature.text=temp.toString()
+                binding.tvTemperature.text = temp.toString()
+                temp
             }
-            //Создаем 3 корутину и у обоих экземпляров job выызваем join
-            lifecycleScope.launch{
-                //join - остановить кортину пока загрузка не будет выполнена и пойдет дальше
-                jobCity.join()
-                jobTemp.join()
+
+            lifecycleScope.launch {
+                //3)Получаем значение из объекта Deferred<>
+                // await() - делает то же самое что и join останавливает коуртину и ждем завершения
+                //загрузки, но он вернет объет который лежит в deferredCity / deferredTemp
+                val city = deferredCity.await()
+                val temp = deferredTemp.await()
+                Toast.makeText(
+                    this@MainActivity,
+                    "City $city -- temperature:$temp",
+                    Toast.LENGTH_SHORT
+                ).show()
                 binding.progress.isVisible = false
                 binding.buttonLoad.isEnabled = true
             }
