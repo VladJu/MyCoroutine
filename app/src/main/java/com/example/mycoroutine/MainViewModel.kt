@@ -1,57 +1,45 @@
 package com.example.mycoroutine
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.*
-import java.math.BigInteger
+import kotlin.concurrent.thread
 
 class MainViewModel : ViewModel() {
 
-    //1
-    private val myCoroutineScope = CoroutineScope(
-        Dispatchers.Main + CoroutineName(
-            "My coroutine scope"
-        )
-    )
+    private val parentJob = Job()
+    private val coroutineScope = CoroutineScope(Dispatchers.Main + parentJob)
 
-    private val _state = MutableLiveData<State>()
-    val state: LiveData<State>
-        get() = _state
-
-
-    //вычисляет значение факториала
-    fun calculate(value: String?) {
-        //Каждый раз когда state меняется, создаем объект State и сохраняем в эту LiveData
-        _state.value = Progress
-        if (value.isNullOrBlank()) {
-            _state.value = Error
-            return
+    fun method() {
+        //1) при вызове launch был создан новый объект Job() который является наследником у
+        // созданного parentJob
+        val childJob1 = coroutineScope.launch {
+            delay(3000)
+            Log.d(LOG_TAG, "first coroutine finished")
         }
-        //2
-        myCoroutineScope.launch(Dispatchers.Main) {
-            val number = value.toLong()
-            //3
-            val result = withContext(Dispatchers.Default) {
-                factorial(number)
-            }
-            _state.value = Factorial(result)
+        val childJob2 = coroutineScope.launch {
+            delay(2000)
+            childJob1.cancel()
+            Log.d(LOG_TAG, "second coroutine finished")
         }
-    }
-
-
-    //Если не suspend, переключаем поток вместе вызова
-    private fun factorial(number: Long): String {
-        var result = BigInteger.ONE
-        for (i in 1..number) {
-            result = result.multiply(BigInteger.valueOf(i))
+        thread {
+            Thread.sleep(2000)
+//            //4)Отменили родительскую Job
+//            parentJob.cancel()
+            //3 Пока дочерние Job-ы не завершат свою работу, род Job не будет закрыта
+            Log.d(LOG_TAG, "Parent job is active:${parentJob.isActive}")
         }
-        return result.toString()
-
+        //2)являются ли childJob1-childJob2 наследниками parentJob
+        Log.d(LOG_TAG, parentJob.children.contains(childJob1).toString())
+        Log.d(LOG_TAG, parentJob.children.contains(childJob2).toString())
     }
 
     override fun onCleared() {
         super.onCleared()
-        myCoroutineScope.cancel()
+        coroutineScope.cancel()
+    }
+
+    companion object {
+        private const val LOG_TAG = "MainViewModel"
     }
 }
