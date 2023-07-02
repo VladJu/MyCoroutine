@@ -8,6 +8,6 @@ sealed class State
 object Error : State()
 object Progress : State()
 //Не сможем сделать объектом т.к у него есть поле и надо будет каждый раз создавать новый экземлр
-class Result(
-    val factorial: String
+class Factorial(
+    val value: String
 ) : State()
