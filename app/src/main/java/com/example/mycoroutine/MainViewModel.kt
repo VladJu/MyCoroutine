@@ -3,14 +3,17 @@ package com.example.mycoroutine
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.math.BigInteger
 
 class MainViewModel : ViewModel() {
 
+    //1
+    private val myCoroutineScope = CoroutineScope(
+        Dispatchers.Main + CoroutineName(
+            "My coroutine scope"
+        )
+    )
 
     private val _state = MutableLiveData<State>()
     val state: LiveData<State>
@@ -25,46 +28,30 @@ class MainViewModel : ViewModel() {
             _state.value = Error
             return
         }
-        viewModelScope.launch {
+        //2
+        myCoroutineScope.launch(Dispatchers.Main) {
             val number = value.toLong()
-            //При вызове данной fun мы выйдем из метода пока факториал не будут вычислен
-            //и Ui thread не будет заблокирован
-            val result = factorial(number)
+            //3
+            val result = withContext(Dispatchers.Default) {
+                factorial(number)
+            }
             _state.value = Factorial(result)
         }
     }
 
-    //OPTION ONE - suspendCoroutine
-//    //1
-//    //Т.к факториал 1000 очень большое число и оно не пометиться в тип Long
-//    //Поэтому используем класс BigInteger
-//    private suspend fun  factorial(number: Long): String {
-//    //2
-//    //Если из метода с callback нам надо сделать suspend fun use method suspendCoroutine
-//    //suspendCoroutine - из обычной fun с callback позволяет сделать suspend fun
-//        return suspendCoroutine {
-//            thread {
-//                var result = BigInteger.ONE
-//                for (i in 1..number) {
-//                    result = result.multiply(BigInteger.valueOf(i))
-//                }
-//                //3 когда получили результат его надо отправить в объект Continuation<String>
-//                //resumeWith если его не вызывать программа не будет выполняться и будет ожидать
-//                завершение работы корутины
-//                it.resumeWith(Result.success(result.toString()))
-//            }
-//        }
-//    }
 
-    //OPTION TWO - WithContext - позволяет переключать потоки
-    //То значение которое хотим вернуть указыаем последним выражением
-    private suspend fun factorial(number: Long): String {
-        return withContext(Dispatchers.Default){
-            var result = BigInteger.ONE
-            for (i in 1..number) {
-                result = result.multiply(BigInteger.valueOf(i))
-            }
-             result.toString()
+    //Если не suspend, переключаем поток вместе вызова
+    private fun factorial(number: Long): String {
+        var result = BigInteger.ONE
+        for (i in 1..number) {
+            result = result.multiply(BigInteger.valueOf(i))
         }
+        return result.toString()
+
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        myCoroutineScope.cancel()
     }
 }
